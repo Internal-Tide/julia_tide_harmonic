@@ -70,26 +70,42 @@ function t_getconsts(ctime)
         astro, ader = t_astron(ctime)
 
         ii = .!isnan.(consts["ishallow"])
-        println(size(ii))
-        println(size(consts["doodson"]))
-        println(size(ader))
-        println(size(consts["freq"]))
-        consts["freq"][.!ii] .= (consts["doodson"][.!ii, :] * ader) / 24
+        # println(size(ii))
+        # println(size(consts["doodson"]))
+        # println(size(ader))
+        consts["freq"][.!ii] .= (consts["doodson"][:, .!ii]' * ader) / 24
 
         shallow_m1 = consts["ishallow"] .- 1
         iname_m1 = shallow["iname"] .- 1
         range_cache = Dict(n => collect(0:n-1) for n in 0:maximum(consts["nshallow"]))
-        for k in findall(ii)
-            ik = shallow_m1[k] .+ range_cache[consts["nshallow"][k]]
-            consts["freq"][k] .= dot(consts["freq"][iname_m1[ik]], shallow["coef"][ik])
+        # for k in findall(ii)
+        #     ik = Int(shallow_m1[k]) .+ range_cache[consts["nshallow"][k]]
+        #     # println(typeof(shallow_m1))
+        #     # println(ik)
+        #     # println(size(shallow_m1))
+        #     # println(size(iname_m1))
+        #     # println(range_cache)
+        #     consts["freq"][k] .= dot(consts["freq"][iname_m1[ik]], shallow["coef"][ik])
+        # end
+
+        for k in findall(x -> x != 0, ii)
+            println(shallow_m1)
+            ik = Int(shallow_m1[k]) .+ range_cache[consts["nshallow"][k]]
+            println(ik)
+            consts["freq"][k] = sum(consts["freq"][iname_m1[ik.+1]] .* shallow["coef"][ik.+1])
         end
     end
 
     return consts, sat, shallow
 end
 
-# _const["ishallow"]
+# _const["freq"][30]
 
-ii = .!isnan.(_const["ishallow"])
-# _const["freq"]
-_const["doodson"]
+# iname_m1 = _shallow["iname"] .- 1
+# _const["freq"][]
+# shallow_m1 = _const["ishallow"] .- 1
+# iname_m1 = _shallow["iname"] .- 1
+# range_cache = Dict(n => collect(0:n-1) for n in 0:maximum(_const["nshallow"]))
+# ik = Int(shallow_m1[30]) .+ range_cache[_const["nshallow"][30]]
+# _const["freq"][iname_m1[ik.+1]]
+# _shallow["coef"][ik.+1]
