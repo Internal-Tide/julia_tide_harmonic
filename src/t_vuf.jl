@@ -1,9 +1,9 @@
 include("t_getconsts.jl")
 
+using LinearAlgebra
 
 
-
-function t_vuf(ltype, ctime, ju, lat)
+function t_vuf(ltype, ctime, ju, lat=nothing)
     """T_VUF Computes nodal modulation corrections.
      [V,U,F]=T_VUF(TYPE,DATE,JU,LAT) returns the astronomical phase V, the
      nodal phase modulation U, and the nodal amplitude correction F at
@@ -30,99 +30,36 @@ function t_vuf(ltype, ctime, ju, lat)
      Get all the info about constituents.
      Calculate astronomical arguments at mid-point of data time series.
     """
-
     astro, ader = t_astron(ctime)
 
-    if ltype == 'full':
+    if ltype == "full"
         consts = t_get18consts(ctime)
-        # Phase relative to Greenwich (in units of cycles).
-        v = rem(np.dot(consts.doodson, astro) + consts.semi, 1)
-        v = v[(ju - 1)]
-        u = np.zeros(shape=(v.shape, v.shape), dtype='float64')
-        f = np.ones(shape=(v.shape, v.shape), dtype='float64')
-    else:
+        v = mod.(consts.doodson * astro .+ consts.semi, 1)
+        v = v[ju]
+        u = zeros(size(v))
+        f = ones(size(v))
+    else
         consts, sat, shallow = t_getconsts(ctime)
-        # Phase relative to Greenwich (in units of cycles).
-        # (This only returns values when we have doodson#s,
-        # i.e., not for the shallow water components,
-        # but these will be computed later.)
-        v = np.fmod(np.dot(consts['doodson'], astro) + consts['semi'], 1)
+        v = mod.(consts["doodson"] * astro .+ consts["semi"], 1)
 
-        if lat is not None:
-            # If we have a latitude, get nodal corrections.
-            # Apparently the second-order terms in the tidal potential
-            # go to zero at the equator, but the third-order terms
-            # do not. Hence when trying to infer the third-order terms
-            # from the second-order terms, the nodal correction factors
-            # blow up. In order to prevent this, it is assumed that the
-            # equatorial forcing is due to second-order forcing OFF the
-            # equator, from about the 5 degree location. Latitudes are
-            # hence (somewhat arbitrarily) forced to be no closer than
-            # 5 deg to the equator, as per note in Foreman.
-            if abs(lat) < 5:
-                lat = np.sign(lat) * 5
-            slat = np.sin(np.pi * lat / 180)
-            # Satellite amplitude ratio adjustment for latitude.
-            rr = sat['amprat']
-            # no amplitude correction
-            if np.isfinite(lat):
-                j = np.flatnonzero(sat['ilatfac'] == 1)
-                # latitude correction for diurnal constituents
-                rr[j] = rr[j] * 0.36309 * (1.0 - 5.0 * slat * slat) / slat
-                j = np.flatnonzero(sat['ilatfac'] == 2)
-                # latitude correction for semi-diurnal constituents
-                rr[j] = rr[j] * 2.59808 * slat
-            else:
-                rr[sat['ilatfac'] > 0] = 0
-            # Calculate nodal amplitude and phase corrections.
-            uu = np.fmod(np.dot(sat['deldood'], astro.T[
-                         3:6]) + sat['phcorr'], 1)
-            # uu=uudbl-round(uudbl);  <_ I think this was wrong.
-            # The original
-            #                         FORTRAN code is:  IUU=UUDBL
-            #                                           UU=UUDBL-IUU
-            #                         which is truncation.
-            # Sum up all of the satellite factors for all satellites.
-            nsat = np.max(sat['iconst'].shape)
-            nfreq = np.max(consts['isat'].shape)
-
-            fsum = np.array(1 + sp.sparse.csr_matrix(
-                (np.squeeze(rr * np.exp(1j * 2 * np.pi * uu)),
-                 (np.arange(0, nsat), np.squeeze(sat['iconst'] - 1))),
-                shape=(nsat, nfreq)).sum(axis=0)).flatten()
-
-            f = np.absolute(fsum)
-            u = np.angle(fsum) / (2 * np.pi)
-
-            # Compute amplitude and phase corrections
-            # for shallow water constituents.
-            shallow_m1  = consts['ishallow'].astype(int) -1
-            iname_m1    = shallow['iname'].astype(int) -1
-            coefs       = shallow['coef'].astype(np.float64)
-            range_cache = {n:np.arange(n) for n in range(consts['nshallow'].max()+1)}
-            for k in np.flatnonzero(np.isfinite(consts['ishallow'])):
-                ik = shallow_m1[k] + range_cache[consts['nshallow'][k]]
-                iname = iname_m1[ik]
-                coef = coefs[ik]
-                f[k] = np.multiply.reduce(np.power(f[iname], coef))
-                u[k] = u[iname].dot(coef)
-                v[k] = v[iname].dot(coef)
-
-            f = f[ju]
-            u = u[ju]
-            v = v[ju]
-
-        else:
-            # Astronomical arguments only, no nodal corrections.
-            # Compute phases for shallow water constituents.
-            for k in np.flatnonzero(np.isfinite(consts['ishallow'])):
-                ik = ((consts['ishallow'][k] - 1 +
-                       np.array(range(0, consts['nshallow'][k]))).astype(int))
-                v[k] = np.dot(v[shallow['iname'][ik] - 1], shallow['coef'][ik])
-
-            v = v[ju]
-            f = np.ones(len(v))
-            u = np.zeros(len(v))
-
-    return v, u, f
+        if lat !== nothing
+            if abs(lat) < 5
+                lat = sign(lat) * 5
             end
+            slat = sind(lat)
+
+            rr = sat["amprat"]
+            if isfinite(lat)
+                j = findall(x -> x == 1, sat["ilatfac"])
+                rr[j] .= rr[j] .* 0.36309 .* (1.0 .- 5.0 .* slat .^ 2) ./ slat
+
+                j = findall(x -> x == 2, sat["ilatfac"])
+                rr[j] .= rr[j] .* 2.59808 .* slat
+            else
+                rr[sat["ilatfac"].>0] .= 0
+            end
+        end
+    end
+
+    return u, v, f
+end
