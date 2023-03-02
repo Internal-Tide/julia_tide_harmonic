@@ -44,13 +44,15 @@ function t_vuf(ltype, ctime, ju, lat=nothing)
         shallow_m1 = consts["ishallow"] .- 1
         iname_m1 = shallow["iname"] .- 1
         coefs = shallow["coef"]
+        # range_cache = [0:consts["nshallow"][k]-1 for k in maximum(1:length(consts["nshallow"]))]
         range_cache = [0:consts["nshallow"][k]-1 for k in 1:length(consts["nshallow"])]
+        @info range_cache
+        @info consts["nshallow"]
         for k in findall(isfinite.(consts["ishallow"]))
             ik = Int(shallow_m1[k]) .+ range_cache[consts["nshallow"][k]]
-            iname = iname_m1[ik.+1]
-            @info iname
+            iname = iname_m1[ik]
+            # @info iname_m1
             coef = coefs[k]
-            @info size(f)
             f[k] .= prod(f[iname+1] .^ coef)
             u[k] .= dot(u[iname+1], coef)
             v[k] .= dot(v[iname+1], coef)
@@ -71,8 +73,6 @@ function t_vuf(ltype, ctime, ju, lat=nothing)
         f .= ones(length(v))
         u .= zeros(length(v))
     end
-
-
     return u, v, f
 end
 
