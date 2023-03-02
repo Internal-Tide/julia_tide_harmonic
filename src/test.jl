@@ -1,6 +1,12 @@
 include("t_getconsts.jl")
-
 using LinearAlgebra
+using Dates
+using SparseArrays
+
+ltype = 1
+ctime = DateTime(2015, 1, 1, 0, 0, 0)
+lat = 5
+ju = 1
 
 
 function t_vuf(ltype, ctime, ju, lat=nothing)
@@ -27,7 +33,6 @@ function t_vuf(ltype, ctime, ju, lat=nothing)
             rr[sat["ilatfac"].>0] .= 0
         end
         uu = mod.(sat["deldood"]' * astro[4:6, :] .+ sat["phcorr"], 1)
-
         nsat = maximum(size(sat["iconst"]))
         nfreq = maximum(size(consts["isat"]))
 
@@ -41,9 +46,11 @@ function t_vuf(ltype, ctime, ju, lat=nothing)
         coefs = shallow["coef"]
         range_cache = [0:consts["nshallow"][k]-1 for k in 1:length(consts["nshallow"])]
         for k in findall(isfinite.(consts["ishallow"]))
-            ik = shallow_m1[k] .+ range_cache[consts["nshallow"][k]]
-            iname = iname_m1[ik]
-            coef = coefs[ik]
+            ik = Int(shallow_m1[k]) .+ range_cache[consts["nshallow"][k]]
+            iname = iname_m1[ik.+1]
+            @info iname
+            coef = coefs[k]
+            @info size(f)
             f[k] .= prod(f[iname+1] .^ coef)
             u[k] .= dot(u[iname+1], coef)
             v[k] .= dot(v[iname+1], coef)
@@ -69,4 +76,10 @@ function t_vuf(ltype, ctime, ju, lat=nothing)
     return u, v, f
 end
 
-mod(-3, 2)
+
+t_vuf(ltype, ctime, ju, lat)
+
+
+
+
+findall(isfinite.(_const["ishallow"]))
